@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import pandas as pd
+from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
@@ -34,27 +35,18 @@ def load_wind_to_bronze():
     print("Gathering wind data (Fingrid)...")
     url = "https://data.fingrid.fi/api/datasets/75/data"
     headers = {"x-api-key": FINGRID_API_KEY}
+    
+    # Last 3 days
+    now = datetime.utcnow()
+    start = now - timedelta(days=3)
+    
     params = {
-        "startTime": "2024-05-01T00:00:00Z",
-        "endTime": "2024-05-02T00:00:00Z",
+        "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "endTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "format": "json"
     }
     
-    # Use of retry
-    try:
-        # requests.get с params inside fetch_with_retry
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status() # Status check
-        data = response.json().get('data', [])
-        
-        if data:
-            df = pd.DataFrame(data)
-            df.rename(columns={'startTime': 'start_time', 'endTime': 'end_time', 'datasetId': 'dataset_id'}, inplace=True)
-            df.to_sql('raw_wind_generation', engine, schema='bronze', if_exists='append', index=False)
-            print(f"✅ Loaded {len(df)} wind rows.")
-    except Exception as e:
-        print(f"❌ Fingrid error: {e}")
-
+  
 def fetch_with_retry(url, headers, retries=3):
     for i in range(retries):
         try:
