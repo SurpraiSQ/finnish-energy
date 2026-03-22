@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: stg_prices
+    columns:
+      - name: start_time_local
+        tests:
+          - not_null
+          - unique
+      - name: price_c_kwh
+        tests:
+          - not_null
+
+  - name: fct_energy_hourly
+    description: "Final: price per hour."
+    columns:
+      - name: start_time_local
+        tests:
+          - not_null
+          - unique
