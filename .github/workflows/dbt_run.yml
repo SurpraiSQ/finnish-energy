@@ -1,0 +1,46 @@
+name: scheduled_dbt_run
+
+on:
+  schedule:
+    # Start at 06:00 UTC 
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Physical run
+
+jobs:
+  run_dbt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install dbt-postgres
+
+      - name: Run dbt
+        env:
+          # pass
+          DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
+        run: |
+          # Создаем временный profiles.yml для GitHub
+          mkdir -p ~/.dbt
+          echo "fin_energy_dbt:
+            outputs:
+              dev:
+                type: postgres
+                host: ep-delicate-glitter-a9hiyh3d.gwc.azure.neon.tech
+                user: neondb_owner
+                pass: $DBT_PASSWORD
+                port: 5432
+                dbname: neondb
+                schema: silver
+                threads: 4
+                sslmode: require
+            target: dev" > ~/.dbt/profiles.yml
+          
+          dbt run
