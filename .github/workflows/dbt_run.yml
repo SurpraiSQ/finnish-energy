@@ -19,8 +19,8 @@ jobs:
           python-version: '3.10'
       - name: Install dependencies
         run: |
-          pip install dbt-postgres pandas psycopg2-binary requests python-dotenv
-
+          pip install dbt-postgres pandas psycopg2-binary requests python-dotenv sqlalchemy
+          
       - name: Run Extract & Load (Python)
         env:
           FINGRID_API_KEY: ${{ secrets.FINGRID_API_KEY }}
