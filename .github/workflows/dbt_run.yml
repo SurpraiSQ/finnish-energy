@@ -17,17 +17,32 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
       - name: Install dependencies
         run: |
-          pip install dbt-postgres
+          pip install dbt-postgres pandas psycopg2-binary requests python-dotenv
+
+      - name: Run Extract & Load (Python)
+        env:
+          FINGRID_API_KEY: ${{ secrets.FINGRID_API_KEY }}
+          NEON_DB_URL: ${{ secrets.NEON_DB_URL }}
+        run: |
+          python extract_load.py
+
+      - name: Run dbt
+        env:
+          DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
+        run: |
+          # profiles.yml
+          mkdir -p ~/.dbt
+          echo "..." > ~/.dbt/profiles.yml
+          dbt run
 
       - name: Run dbt
         env:
           # pass
           DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
         run: |
-          # Создаем временный profiles.yml для GitHub
+          # Temporary profiles.yml for GitHub
           mkdir -p ~/.dbt
           echo "fin_energy_dbt:
             outputs:
