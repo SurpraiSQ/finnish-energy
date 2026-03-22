@@ -36,15 +36,42 @@ def load_wind_to_bronze():
     url = "https://data.fingrid.fi/api/datasets/75/data"
     headers = {"x-api-key": FINGRID_API_KEY}
     
-    # Last 3 days
+    # 24 hour data
     now = datetime.utcnow()
-    start = now - timedelta(days=3)
+    start = now - timedelta(hours=24)
     
     params = {
         "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "endTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "format": "json"
     }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        
+        raw_data = response.json()
+        
+        
+        if isinstance(raw_data, dict):
+            data = raw_data.get('data', [])
+        else:
+            data = raw_data 
+            
+        print(f"DEBUG: Received {len(data)} items from Fingrid")
+        
+        if len(data) > 0:
+            df = pd.DataFrame(data)
+            df.rename(columns={'startTime': 'start_time', 'endTime': 'end_time', 'datasetId': 'dataset_id'}, inplace=True)
+            
+      
+            df.to_sql('raw_wind_generation', engine, schema='bronze', if_exists='replace', index=False)
+            print(f"✅ Successfully loaded {len(df)} wind rows to Bronze.")
+        else:
+            print("⚠️ Warning: Fingrid returned empty list. Check API Key or Dataset ID.")
+            
+    except Exception as e:
+        print(f"❌ Fingrid error: {e}")
     
   
 def fetch_with_retry(url, headers, retries=3):
