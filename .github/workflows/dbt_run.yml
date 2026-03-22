@@ -34,16 +34,6 @@ jobs:
         run: |
           # profiles.yml
           mkdir -p ~/.dbt
-          echo "..." > ~/.dbt/profiles.yml
-          dbt run
-
-      - name: Run dbt
-        env:
-          # pass
-          DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
-        run: |
-          # Temporary profiles.yml for GitHub
-          mkdir -p ~/.dbt
           echo "fin_energy_dbt:
             outputs:
               dev:
@@ -59,3 +49,4 @@ jobs:
             target: dev" > ~/.dbt/profiles.yml
           
           dbt run
+          dbt test
