@@ -29,5 +29,12 @@ The pipeline is triggered by GitHub Actions, which:
 3. Runs `dbt run` to process the data through **Silver** and **Gold** layers.
 4. Executes `dbt test` to validate the final output before the BI layer consumes it.
 
+## 📊 Live Dashboard
+The final analytics are delivered via a live Looker Studio report. 
+It visualizes the correlation between wind power supply and market spot prices.
+
+[🔗 View Live Dashboard](https://lookerstudio.google.com/reporting/0b691455-7ee7-4980-af0b-d98efce2c83c)
+![Dashboard Preview](path/screenshot.png)
+
 ---
 *Created for portfolio purposes. Demonstrates production-grade data engineering principles.*
