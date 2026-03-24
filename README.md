@@ -34,7 +34,7 @@ The final analytics are delivered via a live Looker Studio report.
 It visualizes the correlation between wind power supply and market spot prices.
 
 [🔗 View Live Dashboard](https://lookerstudio.google.com/reporting/0b691455-7ee7-4980-af0b-d98efce2c83c)
-![Dashboard Preview](finnish_energy_scs.jpg)
+![Dashboard Preview](finnish_energy.jpg)
 
 ---
 *Created for portfolio purposes. Demonstrates production-grade data engineering principles.*
