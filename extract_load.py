@@ -44,6 +44,7 @@ def load_wind_to_bronze():
         "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "endTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "format": "json"
+        "pageSize": 5000
     }
     
     try:
