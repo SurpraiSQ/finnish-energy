@@ -2,7 +2,7 @@
 
 [![dbt run](https://github.com/SurpraiSQ/finnish-energy/actions/workflows/dbt_run.yml/badge.svg)](https://github.com/SurpraiSQ/finnish-energy/actions/workflows/dbt_run.yml)
 
-An automated E2E data pipeline designed to ingest, transform, and analyze Finnish electricity spot prices and wind power generation. This project implements a modern **Medallion Architecture** (Bronze, Silver, Gold) using a cloud-native serverless stack.
+An automated E2E data pipeline designed to ingest, transform, and analyze Finnish electricity spot prices and wind power generation. This project implements a modern **Medallion Architecture** (Bronze, Silver, Gold) using a cloud-native serverless stack. 
 
 ## 🛠 Tech Stack
 - **Languages:** Python (Pandas, SQLAlchemy, Requests)
