@@ -38,7 +38,7 @@ def load_wind_to_bronze():
     
     # 24 hour data
     now = datetime.utcnow()
-    start = now - timedelta(hours=24)
+    start = now - timedelta(days=3)
     
     params = {
         "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -65,7 +65,7 @@ def load_wind_to_bronze():
             df.rename(columns={'startTime': 'start_time', 'endTime': 'end_time', 'datasetId': 'dataset_id'}, inplace=True)
             
       
-            df.to_sql('raw_wind_generation', engine, schema='bronze', if_exists='replace', index=False)
+            df.to_sql('raw_wind_generation', engine, schema='bronze', if_exists='append', index=False)
             print(f"✅ Successfully loaded {len(df)} wind rows to Bronze.")
         else:
             print("⚠️ Warning: Fingrid returned empty list. Check API Key or Dataset ID.")
