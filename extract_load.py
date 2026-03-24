@@ -43,7 +43,7 @@ def load_wind_to_bronze():
     params = {
         "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "endTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "format": "json"
+        "format": "json",  # <--- ВОТ ЗДЕСЬ НУЖНА ЗАПЯТАЯ!
         "pageSize": 5000
     }
     
