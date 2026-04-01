@@ -4,7 +4,13 @@ on:
   schedule:
     # Start at 06:00 UTC 
     - cron: '0 6 * * *'
-  workflow_dispatch: # Physical run
+  workflow_dispatch: # Physical run with options
+    inputs:
+      full_refresh:
+        description: 'Run dbt with --full-refresh (Clear silver layer and rebuild)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   run_dbt:
@@ -17,6 +23,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+          
       - name: Install dependencies
         run: |
           pip install dbt-postgres pandas psycopg2-binary requests python-dotenv sqlalchemy
@@ -48,5 +55,13 @@ jobs:
                 sslmode: require
             target: dev" > ~/.dbt/profiles.yml
           
-          dbt run
+          
+          if [ "${{ github.event.inputs.full_refresh }}" = "true" ]; then
+            echo "🚀 Running dbt with FULL REFRESH..."
+            dbt run --full-refresh
+          else
+            echo "⏩ Running dbt normally (incremental)..."
+            dbt run
+          fi
+          
           dbt test
