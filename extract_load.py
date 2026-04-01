@@ -3,7 +3,7 @@ import time
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
 # Load env
@@ -14,11 +14,44 @@ FINGRID_API_KEY = os.getenv("FINGRID_API_KEY")
 # DB connect
 engine = create_engine(DB_URL)
 
+def fetch_with_retry(url, headers, retries=3):
+    for i in range(retries):
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            if i == retries - 1: raise e
+            print(f"Error, next try... {i+1}")
+            time.sleep(5)
+
+# --- UPSERT ---
+def upsert_to_db(df, table_name, schema, unique_key, engine):
+    """Загружает данные во временную таблицу и делает безопасный UPSERT в основную"""
+    temp_table = f"{table_name}_temp"
+    
+    # 1. Upload dataframe in to the table
+    df.to_sql(temp_table, engine, schema=schema, if_exists='replace', index=False)
+    
+    # 2. SQL to paste
+    columns = ', '.join([f'"{col}"' for col in df.columns])
+    
+    upsert_query = f"""
+        INSERT INTO {schema}.{table_name} ({columns})
+        SELECT {columns} FROM {schema}.{temp_table}
+        ON CONFLICT ({unique_key}) DO NOTHING;
+    """
+    
+    # 3. Transaction
+    with engine.begin() as conn:
+        conn.execute(text(upsert_query))
+        conn.execute(text(f"DROP TABLE {schema}.{temp_table}"))
+
+
 def load_prices_to_bronze():
     print("Gathering prices data (Pörssisähkö)...")
     url = "https://api.porssisahko.net/v1/latest-prices.json"
     
-    # Use of retry
     try:
         data_json = fetch_with_retry(url, headers={})
         data = data_json.get('prices', [])
@@ -26,17 +59,19 @@ def load_prices_to_bronze():
         if data:
             df = pd.DataFrame(data)
             df.rename(columns={'startDate': 'start_date', 'endDate': 'end_date'}, inplace=True)
-            df.to_sql('raw_spot_prices', engine, schema='bronze', if_exists='append', index=False)
-            print(f"✅ Done {len(df)} price rows.")
+            
+            upsert_to_db(df, 'raw_spot_prices', 'bronze', 'start_date', engine)
+            print(f"✅ Processed {len(df)} price rows (new rows added, duplicates ignored).")
+            
     except Exception as e:
         print(f"❌ Failed after retries: {e}")
+
 
 def load_wind_to_bronze():
     print("Gathering wind data (Fingrid)...")
     url = "https://data.fingrid.fi/api/datasets/75/data"
     headers = {"x-api-key": FINGRID_API_KEY}
     
-    # 24 hour data
     now = datetime.utcnow()
     start = now - timedelta(days=3)
     
@@ -50,9 +85,7 @@ def load_wind_to_bronze():
     try:
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        
         raw_data = response.json()
-        
         
         if isinstance(raw_data, dict):
             data = raw_data.get('data', [])
@@ -65,26 +98,14 @@ def load_wind_to_bronze():
             df = pd.DataFrame(data)
             df.rename(columns={'startTime': 'start_time', 'endTime': 'end_time', 'datasetId': 'dataset_id'}, inplace=True)
             
-      
-            df.to_sql('raw_wind_generation', engine, schema='bronze', if_exists='append', index=False)
-            print(f"✅ Successfully loaded {len(df)} wind rows to Bronze.")
+            # New function
+            upsert_to_db(df, 'raw_wind_generation', 'bronze', 'start_time', engine)
+            print(f"✅ Processed {len(df)} wind rows (new rows added, duplicates ignored).")
         else:
-            print("⚠️ Warning: Fingrid returned empty list. Check API Key or Dataset ID.")
+            print("⚠️ Warning: Fingrid returned empty list.")
             
     except Exception as e:
         print(f"❌ Fingrid error: {e}")
-    
-  
-def fetch_with_retry(url, headers, retries=3):
-    for i in range(retries):
-        try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            if i == retries - 1: raise e
-            print(f"Error, next try... {i+1}")
-            time.sleep(5) # Wait 5 seconds
 
 if __name__ == "__main__":
     print("🚀 Extract & Load...")
