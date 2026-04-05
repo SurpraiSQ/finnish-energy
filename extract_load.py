@@ -60,11 +60,20 @@ def load_prices_to_bronze():
             df = pd.DataFrame(data)
             df.rename(columns={'startDate': 'start_date', 'endDate': 'end_date'}, inplace=True)
             
+            # --- Data fix ---
+            # Convert date and time
+            df['start_date'] = pd.to_datetime(df['start_date'])
+            df['end_date'] = pd.to_datetime(df['end_date'])
+            # -------------------------
+
+            # New function
             upsert_to_db(df, 'raw_spot_prices', 'bronze', 'start_date', engine)
-            print(f"✅ Processed {len(df)} price rows (new rows added, duplicates ignored).")
-            
+
+
+    
     except Exception as e:
         print(f"❌ Failed after retries: {e}")
+        raise e
 
 
 def load_wind_to_bronze():
@@ -97,6 +106,11 @@ def load_wind_to_bronze():
         if len(data) > 0:
             df = pd.DataFrame(data)
             df.rename(columns={'startTime': 'start_time', 'endTime': 'end_time', 'datasetId': 'dataset_id'}, inplace=True)
+            
+            # Check data and time format
+            df['start_time'] = pd.to_datetime(df['start_time'])
+            df['end_time'] = pd.to_datetime(df['end_time'])
+            # --------------------------------
             
             # New function
             upsert_to_db(df, 'raw_wind_generation', 'bronze', 'start_time', engine)
