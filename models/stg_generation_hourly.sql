@@ -1,34 +1,38 @@
 {{ config(materialized='view', schema='silver') }}
-
-with hourly_avg as (
-    -- Step 1: New AVG for each ID
-    select
-        date_trunc('hour', start_time) as hour,
+    
+WITH base AS (
+    SELECT
+        -- Step 1: New AVG for each ID
+        DATE_TRUNC('hour', start_time) AS hour,
         dataset_id,
-        avg(value) as avg_value
-    from {{ source('bronze', 'raw_generation_3min') }}
-    group by 1, 2
+        value
+    FROM {{ source('bronze', 'raw_generation_3min') }}
 ),
 
-pivoted as (
-    -- Step 2: ID in columns
-    select
+pivoted AS (
+    SELECT
         hour,
-        max(case when dataset_id = 188 then avg_value end) as nuclear_mw,
-        max(case when dataset_id = 181 then avg_value end) as wind_mw,
-        max(case when dataset_id = 191 then avg_value end) as hydro_mw,
-        max(case when dataset_id = 192 then avg_value end) as total_production_mw
-    from hourly_avg
-    group by 1
+        -- Step 2: ID in columns
+        AVG(CASE WHEN dataset_id = 188 THEN value END) AS nuclear_mw,
+        AVG(CASE WHEN dataset_id = 181 THEN value END) AS wind_mw,
+        AVG(CASE WHEN dataset_id = 191 THEN value END) AS hydro_mw,
+        AVG(CASE WHEN dataset_id = 192 THEN value END) AS total_production_mw
+    FROM base
+    GROUP BY 1
 )
 
--- Step 3: Final
-select
+SELECT
     hour,
-    coalesce(nuclear_mw, 0) as nuclear_mw,
-    coalesce(wind_mw, 0) as wind_mw,
-    coalesce(hydro_mw, 0) as hydro_mw,
-    coalesce(total_production_mw, 0) as total_production_mw,
+    ROUND(CAST(nuclear_mw AS NUMERIC), 2) AS nuclear_mw,
+    ROUND(CAST(wind_mw AS NUMERIC), 2) AS wind_mw,
+    ROUND(CAST(hydro_mw AS NUMERIC), 2) AS hydro_mw,
+    ROUND(CAST(total_production_mw AS NUMERIC), 2) AS total_production_mw,
     
-    (total_production_mw - (coalesce(nuclear_mw, 0) + coalesce(wind_mw, 0) + coalesce(hydro_mw, 0))) as other_generation_mw
-from pivoted
+    -- Step 3: Final
+    ROUND(CAST(
+        total_production_mw - (
+            COALESCE(nuclear_mw, 0) + 
+            COALESCE(wind_mw, 0) + 
+            COALESCE(hydro_mw, 0)
+        ) AS NUMERIC), 2) AS other_generation_mw
+FROM pivoted
