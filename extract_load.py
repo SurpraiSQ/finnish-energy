@@ -1,4 +1,4 @@
-import os
+import osimport os
 import time
 import requests
 import pandas as pd
@@ -6,34 +6,36 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
-# Load env
+# Config
 load_dotenv()
 DB_URL = os.getenv("NEON_DB_URL")
 FINGRID_API_KEY = os.getenv("FINGRID_API_KEY")
 
-# DB connect
 engine = create_engine(DB_URL)
 
-def fetch_with_retry(url, headers, retries=3):
+def fetch_with_retry(url, headers, params=None, retries=3):
     for i in range(retries):
         try:
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, params=params)
+            
+            if response.status_code == 429:
+                print(f"Rate limited (429). Sleeping 5s... (Attempt {i+1})")
+                time.sleep(5)
+                continue
+                
             response.raise_for_status()
             return response.json()
+            
         except Exception as e:
             if i == retries - 1: raise e
-            print(f"Error, next try... {i+1}")
+            print(f"Request failed, retrying... {i+1}")
             time.sleep(5)
 
-# --- UPSERT ---
 def upsert_to_db(df, table_name, schema, unique_key, engine):
-    """Загружает данные во временную таблицу и делает безопасный UPSERT в основную"""
     temp_table = f"{table_name}_temp"
     
-    # 1. Upload dataframe in to the table
     df.to_sql(temp_table, engine, schema=schema, if_exists='replace', index=False)
     
-    # 2. SQL to paste
     columns = ', '.join([f'"{col}"' for col in df.columns])
     
     upsert_query = f"""
@@ -42,14 +44,12 @@ def upsert_to_db(df, table_name, schema, unique_key, engine):
         ON CONFLICT ({unique_key}) DO NOTHING;
     """
     
-    # 3. Transaction
     with engine.begin() as conn:
         conn.execute(text(upsert_query))
         conn.execute(text(f"DROP TABLE {schema}.{temp_table}"))
 
-
 def load_prices_to_bronze():
-    print("Gathering prices data (Pörssisähkö)...")
+    print("Fetching Pörssisähkö prices...")
     url = "https://api.porssisahko.net/v1/latest-prices.json"
     
     try:
@@ -60,25 +60,19 @@ def load_prices_to_bronze():
             df = pd.DataFrame(data)
             df.rename(columns={'startDate': 'start_date', 'endDate': 'end_date'}, inplace=True)
             
-            # --- Data fix ---
-            # Convert date and time
             df['start_date'] = pd.to_datetime(df['start_date'])
             df['end_date'] = pd.to_datetime(df['end_date'])
-            # -------------------------
 
-            # New function
             upsert_to_db(df, 'raw_spot_prices', 'bronze', 'start_date', engine)
+            print("✅ OK: Prices processed.")
 
-
-    
     except Exception as e:
-        print(f"❌ Failed after retries: {e}")
+        print(f"❌ FAIL: Prices error: {e}")
         raise e
 
-
-def load_wind_to_bronze():
-    print("Gathering wind data (Fingrid)...")
-    url = "https://data.fingrid.fi/api/datasets/75/data"
+def load_generation_3min_to_bronze():
+    print("Fetching Fingrid 3-min generation...")
+    datasets = [181, 188, 191, 192]
     headers = {"x-api-key": FINGRID_API_KEY}
     
     now = datetime.utcnow()
@@ -88,41 +82,47 @@ def load_wind_to_bronze():
         "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "endTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "format": "json",  
-        "pageSize": 5000
+        "pageSize": 10000
     }
     
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        raw_data = response.json()
+    for dataset_id in datasets:
+        print(f" -> Dataset {dataset_id}")
+        url = f"https://data.fingrid.fi/api/datasets/{dataset_id}/data"
         
-        if isinstance(raw_data, dict):
-            data = raw_data.get('data', [])
-        else:
-            data = raw_data 
+        try:
+            raw_data = fetch_with_retry(url, headers=headers, params=params)
+            if not raw_data:
+                continue
+
+            data = raw_data.get('data', []) if isinstance(raw_data, dict) else raw_data
             
-        print(f"DEBUG: Received {len(data)} items from Fingrid")
-        
-        if len(data) > 0:
-            df = pd.DataFrame(data)
-            df.rename(columns={'startTime': 'start_time', 'endTime': 'end_time', 'datasetId': 'dataset_id'}, inplace=True)
+            if len(data) > 0:
+                df = pd.DataFrame(data)
+                
+                df.rename(columns={
+                    'startTime': 'start_time',
+                    'endTime': 'end_time',
+                    'datasetId': 'dataset_id',
+                    'value': 'value'
+                }, inplace=True)
+                
+                df = df[['dataset_id', 'start_time', 'end_time', 'value']]
+                
+                df['start_time'] = pd.to_datetime(df['start_time'])
+                df['end_time'] = pd.to_datetime(df['end_time'])
+                
+                upsert_to_db(df, 'raw_generation_3min', 'bronze', 'start_time, dataset_id', engine)
+                print(f"✅    OK: {len(df)} rows inserted.")
+            else:
+                print(f"❌    WARN: Empty data.")
             
-            # Check data and time format
-            df['start_time'] = pd.to_datetime(df['start_time'])
-            df['end_time'] = pd.to_datetime(df['end_time'])
-            # --------------------------------
+            time.sleep(2)
             
-            # New function
-            upsert_to_db(df, 'raw_wind_generation', 'bronze', 'start_time', engine)
-            print(f"✅ Processed {len(df)} wind rows (new rows added, duplicates ignored).")
-        else:
-            print("⚠️ Warning: Fingrid returned empty list.")
-            
-    except Exception as e:
-        print(f"❌ Fingrid error: {e}")
+        except Exception as e:
+            print(f"❌    FAIL: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Extract & Load...")
+    print("--- Pipeline Started ---")
     load_prices_to_bronze()
-    load_wind_to_bronze()
-    print("🎉 Done!")
+    load_generation_3min_to_bronze()
+    print("--- Pipeline Finished ---")
