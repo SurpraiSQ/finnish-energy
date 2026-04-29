@@ -4,31 +4,21 @@ WITH prices AS (
     SELECT * FROM {{ ref('stg_prices') }}
 ),
 
-generation AS (
-    -- New layer
+gen AS (
     SELECT * FROM {{ ref('stg_generation_hourly') }}
 )
 
 SELECT
-    -- COALESCE first non-0. 
-    -- if there is no price, from time and same backwards.
-    COALESCE(p.start_time_local, g.hour) AS start_time_local,
-    
-    -- Price Data
+    -- Time
+    COALESCE(p.start_time_local, gen.hour) AS start_time_local,
     p.price_c_kwh,
-    CASE WHEN p.price_c_kwh < 0 THEN true ELSE false END AS is_negative_price,
-    
-    -- Generation Data
-    g.wind_mw,
-    g.nuclear_mw,
-    g.hydro_mw,
-    g.other_generation_mw,
-    g.total_production_mw
-
+    gen.nuclear_mw,
+    gen.wind_mw,
+    gen.hydro_mw,
+    gen.other_generation_mw,
+    gen.total_production_mw,
+    CASE WHEN p.price_c_kwh < 0 THEN true ELSE false END AS is_negative_price
 FROM prices p
--- FULL OUTER JOIN
-FULL OUTER JOIN generation g
-    ON p.start_time_local = g.hour
-
--- Sort by time
+FULL OUTER JOIN gen
+    ON p.start_time_local = gen.hour
 ORDER BY start_time_local DESC
