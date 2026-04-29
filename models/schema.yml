@@ -1,4 +1,4 @@
-version: 2
+version: 3
 
 models:
   - name: stg_prices
@@ -11,10 +11,31 @@ models:
         tests:
           - not_null
 
-  - name: fct_energy_hourly
-    description: "Final: price per hour."
+  - name: stg_generation_hourly
+    description: "Hourly aggregated generation data by energy type (Silver layer)."
     columns:
-      - name: start_time_local
+      - name: hour
         tests:
           - not_null
           - unique
+      - name: nuclear_mw
+      - name: wind_mw
+      - name: hydro_mw
+      - name: total_production_mw
+      - name: other_generation_mw
+
+  - name: fct_energy_hourly
+    description: "Final: Spot prices and generation mix per hour."
+    columns:
+      - name: start_time_local
+        description: "Local time in Helsinki. Guaranteed to be not null."
+        tests:
+          - not_null
+          - unique
+      - name: price_c_kwh
+      - name: is_negative_price
+      - name: nuclear_mw
+      - name: wind_mw
+      - name: hydro_mw
+      - name: other_generation_mw
+      - name: total_production_mw
