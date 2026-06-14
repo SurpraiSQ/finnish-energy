@@ -26,7 +26,7 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install "dbt-postgres~=1.8.0" pandas psycopg2-binary requests python-dotenv sqlalchemy
+          pip install "dbt-core~=1.8.0" "dbt-postgres~=1.8.0" pandas psycopg2-binary requests python-dotenv sqlalchemy
           
       - name: Run Extract & Load (Python)
         env:
