@@ -45,7 +45,7 @@ jobs:
             outputs:
               dev:
                 type: postgres
-                host: ep-delicate-glitter-a9hiyh3d.gwc.azure.neon.tech
+                host: ep-winter-grass-b1w8lk4d-pooler.c-5.eu-central-1.aws.neon.tech
                 user: neondb_owner
                 pass: $DBT_PASSWORD
                 port: 5432
