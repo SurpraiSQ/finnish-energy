@@ -9,7 +9,7 @@ An automated E2E data pipeline designed to ingest, transform, and analyze the **
 * **Data Warehouse:** Neon (Serverless PostgreSQL)
 * **Transformation:** dbt (Data Build Tool)
 * **Orchestration & CI/CD:** GitHub Actions
-* **BI & Visualization:** Looker Studio
+* **BI & Visualization:** Google Data Studio
 * **Data Quality:** dbt tests (Schema & Business logic validation)
 
 ### 🏗 Data Architecture
